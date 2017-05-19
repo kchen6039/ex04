@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cancer</title>
+  <script src="https://d3js.org/d3.v3.js"></script>
+  <style>
+    svg {
+      width: 100%;
+      min-width: 900px;
+      height: 600px;
+    }
+
+    .axis path, .axis line{
+      fill: none;
+      stroke: black;
+      shape-rendering: auto;
+    }
+    .axis text{
+      font-size: 12px;
+    }
+    #tooltip{
+      position: absolute;
+      background: #4E4E4E;
+      color: white;
+      height: auto;
+      padding: 5px;
+      border-radius: 5px;
+    }
+    #tooltip.hidden{
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <p>
+		<a href="index.html">Home</a>
+		<a href="2dSP1.html">2d-Scatter Plot: receipts</a>
+		<a href="cancer1.html">Cancer Study</a>
+  </p>
+  <h1>HW#4c: Cancer Study</h1>
+  癌症別：<select><option value="顯示全部">顯示全部</option></select>
+  <br>
+  
+  <div id="tooltip" class="hidden"></div>
+  <script>
+    var w = 1200;
+    var h = 600;
+    var padding = 60;
+	//var svg = d3.select("svg");
+	
+	svg();
+		
+    d3.csv("cancer_data.csv", function(original_dataSet){
+	    var dataSet = original_dataSet.filter(function(d) { return d.city != "台閩地區"}); 
+		bind(dataSet);
+		render(dataSet);
+		list(dataSet);
+    });
+	
+	function svg(){
+		d3.select("body").append("svg").attr({
+			width: w,
+			height: h
+		});
+		d3.select("svg").append("g").append("rect").attr({
+			width: w,
+			height: h,
+			fill: "lightcyan"
+		});
+		d3.select("svg").append("g").attr("id","axisX");
+		d3.select("svg").append("g").attr("id","axisY");
+    }
+
+
+    function bind(dataSet){
+		console.log("bind");
+		
+		var selection = d3.select("svg").selectAll("circle").data(dataSet);
+						
+		selection.enter().append("circle");
+		selection.exit().remove();
+		
+		console.log(dataSet.length, dataSet[0], dataSet[1], dataSet[dataSet.length-1]);
+    }
+
+    function render(dataSet){
+        console.log("render");
+		
+        var area = dataSet.map(function(d){ return d.city; });
+		area = unique(area);
+		console.log("Aria: ", area);
+		
+		var xScale = d3.time.scale()
+                    .domain( [ new Date(1975, 1, 1),  // d3.min(dataSet, function(d){ return new Date(1975); }
+							   new Date(2015, 12, 31) ]  //d3.max(dataSet, function(d){ return new Date(2015); }
+					)
+                    .range([0+65,w-65]);
+					
+		var xAxis = d3.svg.axis().outerTickSize(0).scale(xScale).orient("bottom");  //.ticks(5)
+					
+		d3.select("svg")
+					.select("g#axisX")
+					.attr("class", "axis")
+					.attr("transform", "translate(0,"+(h-padding)+")")
+					.call(xAxis);
+
+        d3.select("svg")
+			.append("text")
+            .attr("text-anchor", "middle")  // this makes it easy to centre the text as the transform is applied to the anchor
+            .attr("transform", "translate("+ (w/2) +","+(h-(padding/3))+")")  // centre below axis
+            .text("Date of Years");
+				
+		var yScale = d3.scale.linear()   
+					.domain([0, 100])    //d3.max(dataSet, function(d){ return +d.avg_age; })])
+					.range([h-padding-5, padding]);
+					
+		yScale.clamp(true);
+					
+		var yAxis = d3.svg.axis().outerTickSize(0).scale(yScale).orient("left").ticks(5);
+					
+		d3.select("svg")
+					.select("g#axisY")
+					.attr("class", "axis")
+					.attr("transform", "translate("+(padding+5)+",0)")
+					.call(yAxis);
+					
+		// now add titles to the axes
+        d3.select("svg").append("text")
+            .attr("text-anchor", "middle")  // this makes it easy to centre the text as the transform is applied to the anchor
+            .attr("transform", "translate("+ (padding/2) +","+(h/2)+")rotate(-90)")  // text is drawn off the screen top left, move down and out and rotate
+            .text("Average Age of Patients");
+					
+		var rScale = d3.scale.linear()
+					.domain([ d3.min(dataSet, function(d){ return +d.count; }),
+					          d3.max(dataSet, function(d){ return +d.count; }) ])
+					.range([5,20]);
+					
+		var fScale = d3.scale.category20();
+		
+		// draw circles
+		d3.selectAll("circle")
+					.attr({
+						  cx: function(d) {
+								return xScale(new Date( d.date ));
+						  },
+						  cy: function(d) {
+								return yScale( +d.avg_age );
+						  },
+						  r: function(d) {
+								return rScale( +d.count );
+						  },
+						  fill: function(d) {
+								return fScale(area.indexOf( d.city ));
+						  }
+					});
+					
+		d3.selectAll("circle")
+					.on("mouseover", function(d){
+						  d3.select("#tooltip")
+							.html(`${d.city}<br>癌症別：${d.category}<br>病例數：${d.count}<br>平均年齡：${d.avg_age}<br>年度：${d.date}`)
+							.style({
+							  left: `${d3.event.pageX}px`,
+							  top: `${d3.event.pageY}px`
+							});
+						  d3.select("#tooltip").classed("hidden", false);
+					})
+					.on("mouseout", function(d){
+						  d3.select("#tooltip").classed("hidden", true);
+					});
+    }
+
+    function list(dataSet){
+		console.log("list");
+		
+		var category = dataSet.map(function(d){
+			return d.category;
+        });
+		
+		category = unique(category);
+		console.log("Category: ", category);
+
+        d3.select("select")
+			.selectAll("option")
+			.data(category)
+			.enter()
+			.append("option")
+			.attr("value", function(d){ return d })
+			.html(function(d){ return d })
+
+        d3.select("select")
+			.on("change", function(d){
+				var value = d3.select("select").property("value");
+
+				if (value === "顯示全部") {
+					bind(dataSet);
+					render(dataSet);
+					return;
+				} else {
+					var newDataSet = dataSet.filter(function(d) {
+						return d.category === value;
+					});
+				}
+
+				bind(newDataSet);
+				render(newDataSet);
+            });
+    }
+	
+	function unique(array){
+		console.log("unique");
+		
+		var n = [];
+		for(var i = 0; i < array.length; i++){
+			if (n.indexOf(array[i]) == -1){
+				n.push(array[i]);
+			}
+		}
+		return n;
+    }
+	
+  </script>
+</body>
+</html>
+
+<!--
+<svg id="cancer">
+    <g class="x axis"></g>
+    <g class="y axis"></g>
+  </svg>
+-->

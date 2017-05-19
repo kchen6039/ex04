@@ -1,0 +1,236 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice</title>
+    <script src="https://d3js.org/d3.v3.js"></script>
+    <style>
+        .axis path, .axis line{
+            fill: none;
+            stroke: black;
+            shape-rendering: auto;
+        }
+        .axis text{
+            font-size: 12px;
+        }
+        #tooltip{
+          position: absolute;
+          background: #4E4E4E;
+          color: white;
+          height: auto;
+          padding: 5px;
+          border-radius: 5px;
+        }
+        #tooltip.hidden{
+          display: none;
+        }
+    </style>
+</head>
+<body>
+    <p>
+		<a href="index.html">Home</a>
+		<a href="2dSP1.html">2d-Scatter Plot: receipts</a>
+		<a href="cancer1.html">Cancer Study</a>
+    </p>
+	<h1>HW#4b: Monthly Receipts</h1>
+    <div id="tooltip" class="hidden"></div>
+    <script>
+        var w = 1200;
+        var h = 600;
+        var padding = 90;
+        var letterList = ["A","B","C","D","E","F","G","H","I","J","K","M","N","O","P","Q","T","U","V","W","X","Z"];
+
+        svg();
+
+        d3.csv("invoice-taipei.csv", function(dataSet){
+           bind(dataSet);
+           render(dataSet);
+           btnList(dataSet);
+        });
+
+        function svg(){
+            d3.select("body").append("svg").attr({
+                width: w,
+                height: h
+            });
+            d3.select("svg").append("g").append("rect").attr({
+                width: "100%",
+                height: "100%",
+                fill: "steelblue"    //    .style("fill", function(d) { return d.color; });
+            }).attr("stroke-width", 2).attr("stroke", "black").text('D3 was here with rect');
+			
+            d3.select("svg").append("g").attr("id","axisX").text('D3 was here with axisX');
+            d3.select("svg").append("g").attr("id","axisY").text('D3 was here with axisY');
+        }
+		
+        function bind(dataSet){	
+			console.log("bind");
+			var selection = d3.select("svg")
+                                .selectAll("circle")
+                                .data(dataSet);
+            selection.enter().append("circle");
+            selection.exit().remove();
+        }
+		
+        function render(dataSet){
+			console.log("render");
+			
+			var xScale = d3.time.scale()
+                    .domain([new Date(2012, 7, 1), new Date(2016, 12,31)])  
+							//new Date(d3.min(dataSet, function(d){ return new Date(d.date);})), new Date(d3.max(dataSet, function(d){
+							//return new Date(d.date); }))
+                    .range([padding+40,w-padding]);
+					
+			var xAxis = d3.svg.axis().outerTickSize(0).scale(xScale).orient("bottom");
+		  
+			d3.select("svg")
+                .select("g#axisX")
+                .attr("class","axis")
+                .attr("transform", "translate(0,"+(h-padding+10)+")")
+                .call(xAxis);
+				
+			d3.select("svg")
+				.append("text")
+				.attr("text-anchor", "middle")  // this makes it easy to centre the text as the transform is applied to the anchor
+				.attr("transform", "translate("+ (w/2) +","+(h-(padding/3))+")")  // centre below axis
+				.text("Date of Years");
+			
+			var yScale = d3.scale.linear()
+                    .domain([0,d3.max(dataSet, function(d){
+                        return +d.number;
+                    })])
+                    .range([h-padding+5, padding]);
+					
+			var yAxis = d3.svg.axis().outerTickSize(0).scale(yScale).orient("left");
+		
+			d3.select("svg")
+                .select("g#axisY")
+                .attr("class","axis")
+                .attr("transform", "translate("+(padding+40)+",0)")
+                .call(yAxis);
+				
+			// now add titles to the axes
+			d3.select("svg").append("text")
+				.attr("text-anchor", "middle")  // this makes it easy to centre the text as the transform is applied to the anchor
+				.attr("transform", "translate("+ (padding/2) +","+(h/2)+")rotate(-90)")  // text is drawn off the screen top left, 
+																						 // move down and out and rotate
+				.text("Number of Receipts");
+				
+			var rScale = d3.scale.linear()
+                    .domain([d3.min(dataSet, function(d){
+                        return +d.amount;
+                    }),d3.max(dataSet, function(d){
+                        return +d.amount;
+                    })])
+                    .range([5,20]);
+					
+			var fScale = d3.scale.category20();
+					
+			//開始畫圈圈
+            d3.selectAll("circle")
+              .transition()
+              .duration(500)
+              .attr({
+                cx: function(d){
+                  return xScale(new Date(d.date));
+                },
+                cy: function(d){
+                  return yScale(+d.number);
+                },
+                r: function(d){
+                  return rScale(+d.amount);
+                },
+				fill: function(d){ return fScale(letterList.indexOf(d.cid)); }
+              });
+               
+			  d3.selectAll("circle")
+                .on("mouseover", function(d){
+                    d3.select("#tooltip")
+                        .html(`${d.city}<br>${d.industry}<br>發票數量：${d.number}<br>發票金額：${d.amount}`)
+                        .style({
+                          left: `${d3.event.pageX}px`,
+                          top: `${d3.event.pageY}px`
+                        });
+                    d3.select("#tooltip").classed("hidden", false);
+                })
+                .on("mouseout", function(d){
+                    d3.select("#tooltip").classed("hidden", true);
+                });
+        }
+		
+        function btnList(dataSet){
+			console.log("btnList");
+			
+			//industryArr: 行業別陣列(包含重複項目)
+            var industryArr = dataSet.map(function(d){
+               return d.industry;
+            });
+            //uniqueIndustryArr: 行業別陣列(無重複項目)
+            var uniqueIndustryArr = unique(industryArr);
+
+            //filterIndustryArr: 行業別陣列(去除空白項目)
+            var filterIndustryArr = uniqueIndustryArr.filter(function(d){
+               return d!="";
+            });
+          
+             //畫出按鈕們
+            d3.select("body").insert("br", ":first-child");
+
+            d3.select("body")
+                .insert("select", ":first-child")
+                .append("option")
+                .attr("value", "顯示全部")
+                .html("顯示全部")
+
+            var selection = d3.select("select")
+                .selectAll("option")
+                .data(filterIndustryArr);
+
+            selection.enter()
+                .append("option")
+                .attr({
+                    value: function(d){
+                        return d;
+                    }
+                })
+                .html(function(d){
+                    return d;
+                });
+	
+            d3.select("select").on("change",function(d){
+                    //當行業別按鈕按下時執行
+                    var value = d3.select("select").property("value");
+                    update(value);
+                });
+			
+			function update(industryName){
+                if(industryName === "顯示全部"){
+                    bind(dataSet);
+                    render(dataSet);
+                    return;
+                }
+                //過濾行業別符合者
+                var newDataSet = dataSet.filter(function(d){
+                    return d.industry === industryName;
+                });
+                //重新整理bind,render
+                bind(newDataSet);
+                render(newDataSet);
+            };
+			
+			function unique(array){
+			  console.log("update");
+              var n = [];
+              for(var i = 0; i < array.length; i++){
+                if (n.indexOf(array[i]) == -1){
+                    n.push(array[i]);
+                }
+              }
+              return n;
+            }
+          
+        }
+    </script>
+
+</body>
+</html>
